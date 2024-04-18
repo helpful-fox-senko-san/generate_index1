@@ -203,6 +203,9 @@ void cleanup()
 	clear_folder_file_table();
 	hash_table_clear(folderTable);
 	hash_table_clear(pathTable);
+	generatedCount = 0;
+	skippedCount = 0;
+	collisionsCount = 0;
 }
 
 #define DUMMY_VER "9999.05.00.0000.0002"
