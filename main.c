@@ -205,7 +205,7 @@ void cleanup()
 	hash_table_clear(pathTable);
 }
 
-#define DUMMY_VER "9999.05.00.0000.0001"
+#define DUMMY_VER "9999.05.00.0000.0002"
 #define DUMMY_VER_LEN (sizeof DUMMY_VER - 1)
 
 int main(int argc, char** argv)
@@ -228,7 +228,7 @@ int main(int argc, char** argv)
 	{
 		char verbuf[DUMMY_VER_LEN + 1];
 		int result = fread(&verbuf, 1, sizeof verbuf - 1, ver_fh);
-		if (result != (sizeof verbuf - 1) || memcmp(verbuf, DUMMY_VER, DUMMY_VER_LEN) != 0)
+		if (result != (sizeof verbuf - 1) || memcmp(verbuf, DUMMY_VER, 5) != 0)
 		{
 			fprintf(stderr, "ffxivgame.ver incorrect\n");
 			fprintf(stderr, "Run from Dawntrail benchmark 'game' directory!\n");
