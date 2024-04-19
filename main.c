@@ -5,12 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "crc32.h"
+#include "thirdparty/sha1.h"
 #include "hash.h"
 #include "hashlist_db.h"
 #include "index.h"
 #include "index_conv.h"
-#include "sha1.h"
 #include "sqpack.h"
 #include "util.h"
 
@@ -22,10 +21,12 @@ static uint32_t indexId;
 static int in_indexType;
 static int out_indexType;
 
+static int totalGenerated = 0;
+
 _Bool do_input(const char* in_filename)
 {
 	FILE* fh = fopen(in_filename, "rb");
-	int result;
+	size_t result;
 
 	// Completely missing a file is the only non-critical error
 	if (fh == NULL)
@@ -37,7 +38,7 @@ _Bool do_input(const char* in_filename)
 	in_indexType = (sqpackIndexHeader.IndexType == 2) ? 2 : 1;
 	out_indexType = (in_indexType == 2) ? 1 : 2;
 
-	// TexTools only cares about seg1, and we only care about seg2
+	// TexTools only cares about index data
 	// The rest will be thrown away
 	printf("Input: %s (format: Index%d)\n", in_filename, in_indexType);
 	printf("  IndexDataSize = %d bytes (@0x%x) (SHA1: %s)\n", sqpackIndexHeader.IndexDataSize, sqpackIndexHeader.IndexDataOffset, sha1str(sqpackIndexHeader.IndexDataSHA1));
@@ -93,7 +94,7 @@ _Bool do_input(const char* in_filename)
 _Bool do_output(const char* out_filename)
 {
 	FILE* fh = fopen(out_filename, "wb");
-	int result;
+	size_t result;
 
 	my_assert_f(fh != NULL, "Failed to open output file: %s\n", out_filename);
 
@@ -152,8 +153,6 @@ _Bool do_output(const char* out_filename)
 
 extern int dtBenchCollisionResolver(uint32_t indexId, HashlistRecord* first, HashlistRecord* second);
 
-#define LITERAL_CRC32(s) CRC32(s, sizeof((s)) - 1)
-
 void try_convert(uint32_t indexId)
 {
 	char in_filename[64];
@@ -203,6 +202,7 @@ void cleanup()
 	clear_folder_file_table();
 	hash_table_clear(folderTable);
 	hash_table_clear(pathTable);
+	totalGenerated += generatedCount;
 	generatedCount = 0;
 	skippedCount = 0;
 	collisionsCount = 0;
@@ -230,7 +230,7 @@ int main(int argc, char** argv)
 	if (ver_fh != NULL)
 	{
 		char verbuf[DUMMY_VER_LEN + 1];
-		int result = fread(&verbuf, 1, sizeof verbuf - 1, ver_fh);
+		size_t result = fread(&verbuf, 1, sizeof verbuf - 1, ver_fh);
 		if (result != (sizeof verbuf - 1) || memcmp(verbuf, DUMMY_VER, 5) != 0)
 		{
 			fprintf(stderr, "ffxivgame.ver incorrect\n");
@@ -241,6 +241,8 @@ int main(int argc, char** argv)
 		fclose(ver_fh);
 	}
 
+	db_startup();
+	index_startup();
 
 	if (!db_load_all_paths())
 		return EXIT_FAILURE;
@@ -261,6 +263,8 @@ int main(int argc, char** argv)
 
 	try_convert(0x020502); // ex5/020502.win32.index2
 	cleanup();
+
+	printf("Total: Generated %d index entries.\n\n", totalGenerated);
 
 	// Also write an ffxivgame.ver file :)
 	ver_fh = fopen("ffxivgame.ver", "wb");

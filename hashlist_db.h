@@ -22,6 +22,8 @@ typedef struct HashlistRecord
 extern int collisionsCount;
 extern int (*collisionResolver)(uint32_t indexId, HashlistRecord* first, HashlistRecord* second);
 
+void db_startup(void);
+
 DualHash db_fullhash_to_dualhash(uint32_t fullHash, uint32_t indexId, char* fullPathOptional);
 uint32_t db_dualhash_to_fullhash(DualHash dualHash);
 

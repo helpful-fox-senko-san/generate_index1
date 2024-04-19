@@ -5,15 +5,21 @@
 #include <stdlib.h>
 
 #include "hash.h"
+#include "util.h"
 
 // Data stored in folderTable is an index in to folderFileLists, which stores per-folder file tables
-DEFINE_STATIC_HASH_TABLE_4K(folderTable)
+HashTable* folderTable;
+HashTable* pathTable;
 
 HashTable* folderFileLists[MAX_FOLDERS];
 uint32_t folderHashes[MAX_FOLDERS];
 uint32_t folderCount = 0;
 
-DEFINE_STATIC_HASH_TABLE_64K(pathTable)
+void index_startup(void)
+{
+	folderTable = hash_table_alloc_16k();
+	pathTable = hash_table_alloc_64k();
+}
 
 HashTable* get_folder_file_table(uint32_t folderHash)
 {
@@ -41,9 +47,10 @@ HashTable* get_folder_file_table(uint32_t folderHash)
 
 void clear_folder_file_table()
 {
-	for (int i = 0; i < folderCount; ++i)
+	for (uint32_t i = 0; i < folderCount; ++i)
 	{
 		hash_table_free(folderFileLists[i]);
+		folderFileLists[i] = NULL;
 	}
 
 	folderCount = 0;

@@ -6,17 +6,6 @@
 // This value is invalid for both the hash and data values
 #define HASH_RECORD_INVALID ((uint32_t)0xFFFFFFFF)
 
-#define DEFINE_STATIC_HASH_TABLE(name, prefix_bits) \
-	static unsigned _##name##_StaticData[(sizeof(HashTable) + sizeof(HashBucket*) * (1 << prefix_bits)) / sizeof(unsigned)] = {1 << prefix_bits, prefix_bits}; \
-	HashTable* name = (HashTable*)(void*)&_##name##_StaticData; \
-
-#define DEFINE_STATIC_HASH_TABLE_16(name) DEFINE_STATIC_HASH_TABLE(name, 4)
-#define DEFINE_STATIC_HASH_TABLE_64(name) DEFINE_STATIC_HASH_TABLE(name, 6)
-#define DEFINE_STATIC_HASH_TABLE_256(name) DEFINE_STATIC_HASH_TABLE(name, 8)
-#define DEFINE_STATIC_HASH_TABLE_4K(name) DEFINE_STATIC_HASH_TABLE(name, 12)
-#define DEFINE_STATIC_HASH_TABLE_16K(name) DEFINE_STATIC_HASH_TABLE(name, 14)
-#define DEFINE_STATIC_HASH_TABLE_64K(name) DEFINE_STATIC_HASH_TABLE(name, 16)
-
 typedef struct BucketEntry { uint32_t key; uint32_t data; } BucketEntry;
 
 typedef struct HashBucket
@@ -63,9 +52,6 @@ uint32_t hash_bucket_get_data(HashBucket** bucket, uint32_t hash);
 // entry should point within the given bucket
 // potentially returns a new address for entry if the bucket had to grow
 BucketEntry* hash_bucket_entry_put_data(HashBucket** bucket, BucketEntry* entry, uint32_t hash, uint32_t data);
-
-// Returns 1 if the data was already present
-void hash_bucket_put_data(HashBucket** bucket, uint32_t hash, uint32_t data);
 
 
 #endif // HASH_H

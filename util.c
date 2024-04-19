@@ -32,7 +32,7 @@ char* sha1str(char* bytes)
 		strbuf[i * 2] = "0123456789abcdef"[(b >> 4) & 0xF];
 		strbuf[i * 2 + 1] = "0123456789abcdef"[b & 0xF];
 	}
-	strbuf[42] = 0;
+	strbuf[40] = 0;
 	return strbuf;
 }
 

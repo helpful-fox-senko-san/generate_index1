@@ -3,14 +3,16 @@ cmake_minimum_required(VERSION 2.8.12)
 project(generate_index1 LANGUAGES C)
 
 add_library(sqlite3
-	sqlite3.c
-	sqlite3.h
+	thirdparty/sqlite3.c
+	thirdparty/sqlite3.h
 )
 
 add_executable(generate_index1
+	thirdparty/crc32.c
+	thirdparty/crc32.h
+	thirdparty/sha1.c
+	thirdparty/sha1.h
 	_dtbench.c
-	crc32.c
-	crc32.h
 	hash.c
 	hash.h
 	hashlist_db.c
@@ -20,8 +22,6 @@ add_executable(generate_index1
 	index_conv.c
 	index_conv.h
 	main.c
-	sha1.c
-	sha1.h
 	sqpack.c
 	sqpack.h
 	util.c

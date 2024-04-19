@@ -5,23 +5,30 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "thirdparty/sha1.h"
+#include "thirdparty/sqlite3.h"
 #include "hash.h"
-#include "sha1.h"
-#include "sqlite3.h"
+#include "util.h"
 
 static HashlistRecord* dbRecords;
 static int dbRecordCount = 0;
 
 // Folder index points to the first matching record in the db record array (which is sorted by FolderHash)
-DEFINE_STATIC_HASH_TABLE_16K(dbFolderIndex)
+HashTable* dbFolderIndex;
 // Path index points to an index for a full path hash, however due to hash collisions, two entries may be present
 //   (more than two is possible in theory but hasn't happened yet)
-DEFINE_STATIC_HASH_TABLE_64K(dbPathIndex)
+HashTable* dbPathIndex;
+
+void db_startup(void)
+{
+	dbFolderIndex = hash_table_alloc_16k();
+	dbPathIndex = hash_table_alloc_64k();
+}
 
 static void db_allocate(int count)
 {
 	dbRecords = malloc(sizeof(HashlistRecord) * count);
-	assert(dbRecords != NULL);
+	my_assert(dbRecords != NULL);
 	dbRecordCount = count;
 }
 
@@ -150,12 +157,12 @@ uint32_t db_dualhash_to_fullhash(DualHash dualHash)
 
 #define checked_fread(buf, sz, n, fh) \
 	result = fread((buf), sz, (n), (fh)); \
-	if (result != (int)(n)) \
+	if (result != (n)) \
 		return 0;
 
 #define checked_fwrite(buf, sz, n, fh) \
 	result = fwrite((buf), sz, (n), (fh)); \
-	if (result != (int)(n)) \
+	if (result != (n)) \
 		return 0;
 
 static void db_error(const char* errmsg)
@@ -168,7 +175,7 @@ static void db_error(const char* errmsg)
 
 static int db_save_hashtable(HashTable* table, FILE* fh)
 {
-	int result;
+	size_t result;
 	checked_fwrite(&table->prefix_bits, 1, sizeof table->prefix_bits, fh);
 	checked_fwrite(&table->len, 1, sizeof table->len, fh);
 
@@ -191,7 +198,7 @@ static int db_save_hashtable(HashTable* table, FILE* fh)
 
 static int db_load_hashtable(HashTable* table, FILE* fh)
 {
-	int result;
+	size_t result;
 	unsigned prefix_bits, len;
 	checked_fread(&prefix_bits, 1, sizeof prefix_bits, fh);
 	checked_fread(&len, 1, sizeof len, fh);
@@ -213,7 +220,7 @@ static int db_load_hashtable(HashTable* table, FILE* fh)
 			continue;
 		}
 		HashBucket* bucket = malloc(sizeof(HashBucket) + sizeof(BucketEntry) * len);
-		assert(bucket != NULL);
+		my_assert(bucket != NULL);
 		bucket->len = len;
 		checked_fread(&bucket->entries[0], 1, sizeof(BucketEntry) * bucket->len, fh);
 		*bucket_ptr = bucket;
@@ -227,12 +234,12 @@ static int db_load_hashtable(HashTable* table, FILE* fh)
 static int db_save_cache()
 {
 	FILE* fh = fopen("hashlist.cache", "wb");
-	int result;
+	size_t result;
 	if (!fh)
 		return 0;
 	unsigned Version = 1000;
 	result = fwrite(&Version, 1, sizeof Version, fh);
-	Version = sizeof(long);
+	Version = sizeof(void*);
 	result = fwrite(&Version, 1, sizeof Version, fh);
 	Version = sizeof(HashlistRecord);
 	result = fwrite(&Version, 1, sizeof Version, fh);
@@ -257,7 +264,7 @@ static int db_save_cache()
 static int db_load_cache()
 {
 	FILE* fh = fopen("hashlist.cache", "rb");
-	int result;
+	size_t result;
 	if (!fh)
 		return 0;
 	unsigned Version;
@@ -265,7 +272,7 @@ static int db_load_cache()
 	if (Version != 1000)
 		return 0;
 	checked_fread(&Version, 1, sizeof Version, fh);
-	if (Version != sizeof(long))
+	if (Version != sizeof(void*))
 		return 0;
 	checked_fread(&Version, 1, sizeof Version, fh);
 	if (Version != sizeof(HashlistRecord))
@@ -281,8 +288,8 @@ static int db_load_cache()
 		return 0;
 	checked_fread(&dbRecordCount, 1, sizeof dbRecordCount, fh);
 	dbRecords = malloc(sizeof(HashlistRecord) * dbRecordCount);
-	assert(dbRecords != NULL);
-	result = fread(dbRecords, 1, sizeof(HashlistRecord) * dbRecordCount, fh);
+	my_assert(dbRecords != NULL);
+	checked_fread(dbRecords, 1, sizeof(HashlistRecord) * dbRecordCount, fh);
 
 	if (!db_load_hashtable(dbFolderIndex, fh))
 		return 0;
@@ -299,7 +306,7 @@ _Bool db_load_all_paths()
 {
 	if (db_load_cache())
 	{
-		printf("Loaded %d records from hashlist.cache\n", dbRecords);
+		printf("Loaded %d records from hashlist.cache\n", dbRecordCount);
 		return 1;
 	}
 
@@ -330,23 +337,27 @@ _Bool db_load_all_paths()
 			db_allocate(count);
 		}
 
-		assert(result == SQLITE_DONE);
+		if (result != SQLITE_DONE)
+			db_error(sqlite3_errmsg(db));
 
 		result = sqlite3_finalize(stmt);
-		assert(result == SQLITE_OK);
+
+		if (result != SQLITE_OK)
+			db_error(sqlite3_errmsg(db));
 	}
 
 	// Query 2
 	{
-		//const char query[] = "SELECT fullhash, folderhash, filehash FROM fullpaths ORDER BY folderhash ASC, filehash ASC";
-
+		// XXX: Use simpler query for now since we're not using the path names yet
+		const char query[] = "SELECT fullhash, folderhash, filehash, indexid FROM fullpaths ORDER BY folderhash ASC, filehash ASC";
+#if 0
 		const char query[] = "\
 SELECT fullhash, folderhash, filehash, indexid, folders.text || '/' || filenames.text \
 FROM fullpaths \
 LEFT JOIN folders ON folders.id = fullpaths.folder \
 LEFT JOIN filenames ON filenames.id = fullpaths.file \
 ORDER BY folderhash ASC, filehash ASC";
-
+#endif
 		if (sqlite3_prepare_v2(db, query, sizeof query - 1, &stmt, NULL) != SQLITE_OK)
 			db_error(sqlite3_errmsg(db));
 
@@ -361,21 +372,27 @@ ORDER BY folderhash ASC, filehash ASC";
 			unsigned folderHash = (unsigned)sqlite3_column_int(stmt, 1);
 			unsigned fileHash = (unsigned)sqlite3_column_int(stmt, 2);
 			unsigned indexId = (unsigned)sqlite3_column_int(stmt, 3);
-			const char* fullPath = (const char*)sqlite3_column_text(stmt, 4);
+			//const char* fullPath = (const char*)sqlite3_column_text(stmt, 4);
+			const char* fullPath = "unused";
 
 			db_store(idx++, fullHash, folderHash, fileHash, indexId, fullPath);
 		}
 
-		assert(result == SQLITE_DONE);
+		if (result != SQLITE_DONE)
+			db_error(sqlite3_errmsg(db));
 
 		printf("Read %d entries from hashlist.db\n", idx);
 
 		result = sqlite3_finalize(stmt);
-		assert(result == SQLITE_OK);
+
+		if (result != SQLITE_OK)
+			db_error(sqlite3_errmsg(db));
 	}
 
 	result = sqlite3_close(db);
-	assert(result == SQLITE_OK);
+
+	if (result != SQLITE_OK)
+		db_error(sqlite3_errmsg(db));
 
 	db_save_cache();
 	return 1;

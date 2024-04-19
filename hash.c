@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "hash.h"
+#include "util.h"
 
 // 64 - 32768 bytes... If a single hash bucket ever grows larger than this something is going wrong
 #if UINTPTR_MAX > 0xFFFFFFFF
@@ -19,7 +20,7 @@ HashTable* hash_table_alloc(unsigned prefix_bits)
 	assert(prefix_bits > 0 && prefix_bits < 32);
 	unsigned len = (1 << prefix_bits);
 	HashTable* table = calloc(1, sizeof(HashTable) + sizeof(HashBucket*) * len);
-	assert(table != NULL);
+	my_assert(table != NULL);
 	table->len = len;
 	table->prefix_bits = prefix_bits;
 	return table;
@@ -58,11 +59,11 @@ pair_uint32_t hash_get_data2(HashTable* table, uint32_t hash)
 	HashBucket** bucket_ptr = hash_locate_bucket(table, hash);
 	BucketEntry* entry = hash_bucket_find_entry(bucket_ptr, hash);
 	if (entry->key == HASH_RECORD_INVALID)
-		return ((struct pair_uint32_t){HASH_RECORD_INVALID, HASH_RECORD_INVALID});
+		return ((pair_uint32_t){HASH_RECORD_INVALID, HASH_RECORD_INVALID});
 	else if ((entry+1)->key != hash)
-		return ((struct pair_uint32_t){entry->data, HASH_RECORD_INVALID});
+		return ((pair_uint32_t){entry->data, HASH_RECORD_INVALID});
 	else
-		return ((struct pair_uint32_t){entry->data, (entry+1)->data});
+		return ((pair_uint32_t){entry->data, (entry+1)->data});
 }
 
 void hash_put_data(HashTable* table, uint32_t hash, uint32_t data)
@@ -79,7 +80,7 @@ HashBucket** hash_locate_bucket(HashTable* table, uint32_t hash)
 	if (table->buckets[prefix] == NULL)
 	{
 		table->buckets[prefix] = malloc(sizeof(HashBucket) + sizeof(BucketEntry*) * INITIAL_BUCKET_SIZE);
-		assert(table->buckets[prefix] != NULL);
+		my_assert(table->buckets[prefix] != NULL);
 		table->buckets[prefix]->len = INITIAL_BUCKET_SIZE;
 		table->buckets[prefix]->entries[0].key = HASH_RECORD_INVALID;
 		table->buckets[prefix]->entries[0].data = HASH_RECORD_INVALID;
@@ -108,11 +109,10 @@ BucketEntry* hash_bucket_entry_put_data(HashBucket** bucket_ptr, BucketEntry* en
 	assert(entry >= &(*bucket_ptr)->entries[0]);
 	assert(entry <= &(*bucket_ptr)->entries[len - 1]);
 
-	// Table is full (entry points to the end of the bucket entry array)
+	// Table is full
 	if (bucket->entries[len - 1].key == HASH_RECORD_INVALID)
 	{
-		fflush(stdout);
-		unsigned idx = (entry - &bucket->entries[0]);
+		size_t idx = (entry - &bucket->entries[0]);
 		len = (len << 1);
 		assert(len <= MAX_BUCKET_SIZE);
 		bucket = realloc(bucket, sizeof(HashBucket) + sizeof(BucketEntry*) * len);
@@ -136,14 +136,12 @@ BucketEntry* hash_bucket_entry_put_data(HashBucket** bucket_ptr, BucketEntry* en
 	}
 	else
 	{
-		//fprintf(stderr, "HASH COLLISION: %08X\n", hash);
-		//fflush(stdout);
-
-		// Inserting a duplicate key, first seek to the end of any matching hashes, then shift the entire table forwards
+		// Inserting a duplicate key
+		// First seek to the end of any matching hashes, then shift the entire table forwards
 		while (entry->key == hash)
 			++entry;
 
-		int tailBytes = ((&bucket->entries[len - 1]) - entry) * sizeof(BucketEntry*);
+		size_t tailBytes = ((&bucket->entries[len - 1]) - entry) * sizeof(BucketEntry*);
 		memmove(entry + 1, entry, tailBytes);
 		entry->key = hash;
 		entry->data = data;

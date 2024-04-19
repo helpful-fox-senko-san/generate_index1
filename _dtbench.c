@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-#include "crc32.h"
+#include "thirdparty/crc32.h"
 
 #define LITERAL_CRC32(s) CRC32(s, sizeof((s)) - 1)
 

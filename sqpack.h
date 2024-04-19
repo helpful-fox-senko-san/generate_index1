@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "sha1.h"
+#include "thirdparty/sha1.h"
 
 typedef struct SqPackHeader
 {
@@ -18,8 +18,6 @@ typedef struct SqPackHeader
 
 	char HeaderSHA1[64];
 } SqPackHeader;
-
-_Static_assert(sizeof(SqPackHeader) == 0x400, "SqPackHeader wrong size");
 
 typedef struct SqPackIndexHeader
 {
@@ -51,8 +49,6 @@ typedef struct SqPackIndexHeader
 	char IndexHeaderSHA1[64];
 } SqPackIndexHeader;
 
-_Static_assert(sizeof(SqPackIndexHeader) == 0x400, "SqPackIndexHeader wrong size");
-
 typedef struct Index1PathIndexRecord
 {
 	uint32_t FileHash;
@@ -61,39 +57,18 @@ typedef struct Index1PathIndexRecord
 	uint32_t _padding1;
 } Index1PathIndexRecord;
 
-_Static_assert(sizeof(Index1PathIndexRecord) == 16, "Index1PathIndexRecord wrong size");
-
 typedef struct Index2PathIndexRecord
 {
 	uint32_t PathHash;
 	uint32_t Data;
 } Index2PathIndexRecord;
 
+#if __STDC_VERSION__ >= 201112L
+_Static_assert(sizeof(SqPackHeader) == 0x400, "SqPackHeader wrong size");
+_Static_assert(sizeof(SqPackIndexHeader) == 0x400, "SqPackIndexHeader wrong size");
+_Static_assert(sizeof(Index1PathIndexRecord) == 16, "Index1PathIndexRecord wrong size");
 _Static_assert(sizeof(Index2PathIndexRecord) == 8, "Index2PathIndexRecord wrong size");
-
-typedef struct Index1SynonymRecord
-{
-	uint32_t FileHash;
-	uint32_t FolderHash;
-	uint32_t Unknown;
-	uint32_t Data;
-	uint32_t Index;
-	char Path[256 - 20];
-} Index1SynonymRecord;
-
-_Static_assert(sizeof(Index1SynonymRecord) == 256, "Index1SynonymRecord wrong size");
-
-typedef struct Index2SynonymRecord
-{
-	uint32_t FileHash;
-	uint32_t FolderHash;
-	uint32_t Unknown;
-	uint32_t Data;
-	uint32_t Index;
-	char Path[256 - 20];
-} Index2SynonymRecord;
-
-_Static_assert(sizeof(Index1SynonymRecord) == 256, "Index2SynonymRecord wrong size");
+#endif
 
 void read_SqPackHeader(SqPackHeader* out, FILE* fh);
 void write_SqPackHeader(const SqPackHeader* data, FILE* fh);

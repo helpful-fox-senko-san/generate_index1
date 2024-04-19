@@ -29,7 +29,7 @@ void generate_index1_data(uint32_t indexId)
 
 			if (collisionsCount != cc)
 			{
-				printf(" !! collided lookup: FullHash %08x => { FileHash=%08x, FolderHash=%08x }\n", fullHash, dualHash.FileHash, dualHash.FolderHash);
+				printf(" !! collided: FullHash %08x => { FileHash=%08x, FolderHash=%08x }\n", fullHash, dualHash.FileHash, dualHash.FolderHash);
 			}
 
 			//printf("lookup: { FileHash=%08x, FolderHash=%08x } => FullHash %08x\n", fullHash, dualHash.FileHash, dualHash.FolderHash);
