@@ -30,4 +30,6 @@ uint32_t db_dualhash_to_fullhash(DualHash dualHash);
 // This loads the hash conversion table from hashlist.db in memory for querying
 _Bool db_load_all_paths();
 
+void db_print_colliding_fullhash(uint32_t fullHash, uint32_t indexId);
+
 #endif // DB_H

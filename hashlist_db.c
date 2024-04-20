@@ -397,3 +397,57 @@ ORDER BY folderhash ASC, filehash ASC";
 	db_save_cache();
 	return 1;
 }
+
+void db_print_colliding_fullhash(uint32_t fullHash, uint32_t indexId)
+{
+	int result;
+	sqlite3* db = NULL;
+	sqlite3_stmt* stmt = NULL;
+
+	result = sqlite3_open_v2("hashlist.db", &db, SQLITE_OPEN_READONLY, NULL);
+
+	// Missing db is not fatal, this is only for informational purposes
+	if (result != SQLITE_OK)
+		return;
+
+	// Query
+	{
+		const char query[] = "\
+SELECT fullhash, folderhash, filehash, indexid, folders.text || '/' || filenames.text \
+FROM fullpaths \
+LEFT JOIN folders ON folders.id = fullpaths.folder \
+LEFT JOIN filenames ON filenames.id = fullpaths.file \
+WHERE indexid = ? AND fullhash = ?";
+
+		if (sqlite3_prepare_v2(db, query, sizeof query - 1, &stmt, NULL) != SQLITE_OK)
+			db_error(sqlite3_errmsg(db));
+
+		if (sqlite3_bind_int(stmt, 1, (int32_t)indexId) != SQLITE_OK
+		 || sqlite3_bind_int(stmt, 2, (int32_t)fullHash) != SQLITE_OK)
+			db_error(sqlite3_errmsg(db));
+
+		while ((result = sqlite3_step(stmt)) == SQLITE_ROW)
+		{
+			unsigned fullHash = (unsigned)sqlite3_column_int(stmt, 0);
+			unsigned folderHash = (unsigned)sqlite3_column_int(stmt, 1);
+			unsigned fileHash = (unsigned)sqlite3_column_int(stmt, 2);
+			unsigned indexId = (unsigned)sqlite3_column_int(stmt, 3);
+			const char* fullPath = (const char*)sqlite3_column_text(stmt, 4);
+
+			printf("%08x : %s\n", fullHash, fullPath);
+		}
+
+		if (result != SQLITE_DONE)
+			db_error(sqlite3_errmsg(db));
+
+		result = sqlite3_finalize(stmt);
+
+		if (result != SQLITE_OK)
+			db_error(sqlite3_errmsg(db));
+	}
+
+	result = sqlite3_close(db);
+
+	if (result != SQLITE_OK)
+		db_error(sqlite3_errmsg(db));
+}

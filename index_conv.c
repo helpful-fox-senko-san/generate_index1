@@ -27,9 +27,11 @@ void generate_index1_data(uint32_t indexId)
 
 			DualHash dualHash = db_fullhash_to_dualhash(fullHash, indexId, NULL);
 
-			if (collisionsCount != cc)
+			// Don't care about ex5 collisions
+			if (collisionsCount != cc && (indexId & 0x00FF00) == 0)
 			{
-				printf(" !! collided: FullHash %08x => { FileHash=%08x, FolderHash=%08x }\n", fullHash, dualHash.FileHash, dualHash.FolderHash);
+				printf(" !! collided: FullHash %08x\n", fullHash, dualHash.FileHash, dualHash.FolderHash);
+				db_print_colliding_fullhash(fullHash, indexId);
 			}
 
 			//printf("lookup: { FileHash=%08x, FolderHash=%08x } => FullHash %08x\n", fullHash, dualHash.FileHash, dualHash.FolderHash);
