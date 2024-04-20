@@ -50,40 +50,56 @@ _Bool do_input(const char* in_filename)
 
 	if (in_indexType == 2)
 	{
-		int n = sqpackIndexHeader.IndexDataSize / sizeof(Index2PathIndexRecord);
+		int numRecords = sqpackIndexHeader.IndexDataSize / sizeof(Index2PathIndexRecord);
+		int numRecordsRead = 0;
 
-		for (int i = 0; i < n; ++i)
+		for (int i = 0; i < numRecords; i += numRecordsRead)
 		{
-			Index2PathIndexRecord record;
-			result = fread(&record, 1, sizeof(Index2PathIndexRecord), fh);
-			my_assert_f(result == sizeof(Index2PathIndexRecord), "Failed to read from input at 0x%x\n", (unsigned)ftell(fh));
+			Index2PathIndexRecord records[1024];
+			size_t readSize = sizeof(Index2PathIndexRecord) * umin(numRecords - i, sizeof(records) / sizeof(Index2PathIndexRecord));
+			result = fread(&records[0], 1, readSize, fh);
+			my_assert_f(result == readSize, "Failed to read from input at 0x%x\n", (unsigned)ftell(fh));
 
-			if (record.Data & 1)
-			{
-				printf(" !! synonym record: { PathHash=%08x, Data=%08x }\n", record.PathHash, record.Data);
-				++skippedCount;
-			}
-			else
-			{
-				hash_put_data(pathTable, record.PathHash, record.Data);
-			}
+			numRecordsRead = result / sizeof(Index2PathIndexRecord);
 
-			//printf("record: { PathHash=%08x, Data=%08x }\n", record.PathHash, record.Data);
+			for (int recordIdx = 0; recordIdx < numRecordsRead; ++recordIdx)
+			{
+				Index2PathIndexRecord* record = &records[recordIdx];
+
+				if (record->Data & 1)
+				{
+					printf(" !! synonym record: { PathHash=%08x, Data=%08x }\n", record->PathHash, record->Data);
+					++skippedCount;
+				}
+				else
+				{
+					hash_put_data(pathTable, record->PathHash, record->Data);
+					//printf("record: { PathHash=%08x, Data=%08x }\n", record->PathHash, record->Data);
+				}
+			}
 		}
 	}
 	else
 	{
-		int n = sqpackIndexHeader.IndexDataSize / sizeof(Index1PathIndexRecord);
+		int numRecords = sqpackIndexHeader.IndexDataSize / sizeof(Index1PathIndexRecord);
+		int numRecordsRead = 0;
 
-		for (int i = 0; i < n; ++i)
+		for (int i = 0; i < numRecords; i += numRecordsRead)
 		{
-			Index1PathIndexRecord record;
-			result = fread(&record, 1, sizeof(Index1PathIndexRecord), fh);
-			my_assert_f(result == sizeof(Index1PathIndexRecord), "Failed to read from input at 0x%x\n", (unsigned)ftell(fh));
+			Index1PathIndexRecord records[512];
+			size_t readSize = sizeof(Index1PathIndexRecord) * umin(numRecords - i, sizeof(records) / sizeof(Index1PathIndexRecord));
+			result = fread(&records[0], 1, readSize, fh);
+			my_assert_f(result == readSize, "Failed to read from input at 0x%x\n", (unsigned)ftell(fh));
 
-			HashTable* fileTable = get_folder_file_table(record.FolderHash);
-			hash_put_data(fileTable, record.FileHash, record.Data);
-			//printf("record: { FileHash=%08x, FolderHash=%08x, Data=%08x }\n", record.FileHash, record.FolderHash, record.Data);
+			numRecordsRead = result / sizeof(Index1PathIndexRecord);
+
+			for (int recordIdx = 0; recordIdx < numRecordsRead; ++recordIdx)
+			{
+				Index1PathIndexRecord* record = &records[recordIdx];
+				HashTable* fileTable = get_folder_file_table(record->FolderHash);
+				hash_put_data(fileTable, record->FileHash, record->Data);
+				//printf("record: { FileHash=%08x, FolderHash=%08x, Data=%08x }\n", record->FileHash, record->FolderHash, record->Data);
+			}
 		}
 	}
 
